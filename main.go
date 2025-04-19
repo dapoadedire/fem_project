@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dapoadedire/fem_project/internal/app"
+	"github.com/dapoadedire/fem_project/internal/routes"
 )
 
 func main() {
@@ -17,17 +18,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	r := routes.SetupRoutes(app)
 
-	http.HandleFunc("/health", app.HealthCheck)
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
+		Handler:      r,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 20 * time.Second,
 	}
 
 	app.Logger.Printf("we are running on port %d\n", port)
-
 
 	err = server.ListenAndServe()
 	if err != nil {
