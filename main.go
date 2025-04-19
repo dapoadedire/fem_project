@@ -18,8 +18,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	r := routes.SetupRoutes(app)
+	defer app.DB.Close()
 
+	
+	r := routes.SetupRoutes(app)
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      r,
