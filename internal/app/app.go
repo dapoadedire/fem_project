@@ -1,14 +1,15 @@
 package app
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"database/sql"
 
 	"github.com/dapoadedire/fem_project/internal/api"
 	"github.com/dapoadedire/fem_project/internal/store"
+	"github.com/dapoadedire/fem_project/migrations"
 )
 
 type Application struct {
@@ -18,7 +19,6 @@ type Application struct {
 }
 
 func NewApplication() (*Application, error) {
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
 	// stores will go here
 	pgDB, err:= store.Open()
@@ -26,10 +26,19 @@ func NewApplication() (*Application, error) {
 		return nil, err
 	}
 
+	err = store.MigrateFS(pgDB, migrations.FS, ".")
+	if err != nil {
+		panic(err)
+	}
+
+	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
+
 
 	// our handlers will go here
+	workoutStore:=store.NewPostgresWorkoutStore(pgDB)
 
-	workoutHandler:=api.NewWorkoutHandler()
+	workoutHandler:=api.NewWorkoutHandler(workoutStore)
 
 
 	app := &Application{

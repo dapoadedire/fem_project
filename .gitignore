@@ -29,3 +29,6 @@ go.work.sum
 
 /database
 ./database
+
+/fem_project_api_docs
+./fem_project_api_docs
