@@ -61,12 +61,15 @@ func (pg *PostgresWorkoutStore) CreateWorkout(workout *Workout) (*Workout, error
 	}
 	// we also need to insert the entries
 
-	for _, entry := range workout.Entries {
+	// Iterate by index to modify the original slice elements
+	for i := range workout.Entries {
+		entry := &workout.Entries[i] // Get a pointer to the element
 		query :=
 			`INSERT INTO workout_entries(workout_id, exercise_name, sets, reps, duration_seconds, weight, notes, order_index)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 		`
+		// Scan the returned ID into the original entry's ID field via the pointer
 		err = tx.QueryRow(query, workout.ID, entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, entry.OrderIndex).Scan(&entry.ID)
 		if err != nil {
 			return nil, err
@@ -157,19 +160,24 @@ func (pg *PostgresWorkoutStore) UpdateWorkout(workout *Workout) error {
 		return err
 	}
 
-	for _, entry := range workout.Entries {
+	// Iterate by index here as well for consistency, although ID is not returned/scanned
+	for i := range workout.Entries {
+		entry := &workout.Entries[i]
 		query :=
 			`INSERT INTO workout_entries (workout_id, exercise_name, sets, reps, duration_seconds, weight, notes, order_index)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		`
-		_, err = tx.Exec(query, workout.ID, entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, entry.OrderIndex)
+		RETURNING id 
+		` // Added RETURNING id to get the new ID after deletion/re-insertion
+		// Scan the new ID back into the entry
+		err = tx.QueryRow(query, workout.ID, entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, entry.OrderIndex).Scan(&entry.ID)
 		if err != nil {
+			// Consider returning the error or logging it
+			// If you return here, the transaction will be rolled back
 			return err
 		}
 	}
 
 	return tx.Commit()
-
 }
 
 func (pg *PostgresWorkoutStore) DeleteWorkout(id int64) error {
