@@ -131,7 +131,7 @@ func (pg *PostgresWorkoutStore) UpdateWorkout(workout *Workout) error {
 	defer tx.Rollback()
 	query :=
 		`UPDATE workouts
-		SET title = $1, description = $2, duration_minutes = $3, calories_burned = $4
+		SET title = $1, description = $2, duration_minutes = $3, calories_burned = $4, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $5
 		`
 	result, err := tx.Exec(query, workout.Title, workout.Description, workout.DurationMinutes, workout.CaloriesBurned, workout.ID)
@@ -154,7 +154,6 @@ func (pg *PostgresWorkoutStore) UpdateWorkout(workout *Workout) error {
 		return err
 	}
 
-
 	for _, entry := range workout.Entries {
 		query :=
 			`INSERT INTO workout_entries (workout_id, exercise_name, sets, reps, duration_seconds, weight, notes, order_index)
@@ -166,6 +165,6 @@ func (pg *PostgresWorkoutStore) UpdateWorkout(workout *Workout) error {
 		}
 	}
 
-	return  tx.Commit()
+	return tx.Commit()
 
 }
