@@ -2,12 +2,38 @@ package store
 
 import (
 	"database/sql"
+	"errors"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
 type password struct {
-	plaintext *string
+	plainText *string
 	hash      []byte
+}
+
+func (password *password) SetPassword(plaintextPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(plaintextPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	password.plainText = &plaintextPassword
+	password.hash = hash
+	return nil
+}
+
+func (password *password) Matches(plaintextPassword string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword(password.hash, []byte(plaintextPassword))
+	
+	if err != nil {
+		switch {
+			case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
+				return false, nil
+			default:
+				return false, err // internal server error
+		}
+	}
+	return true, nil
 }
 
 type User struct {
@@ -34,14 +60,14 @@ func NewPostgresUserStore(db *sql.DB) *PostgresUserStore {
 }
 
 type UserStore interface {
-	CreateUser(*User) (*User, error)
+	CreateUser(*User) ( error)
 	GetUserByUsername(username string) (*User, error)
 	UpdateUser(*User) error
-	DeleteUser(id int64) error
-	GetUserByEmail(email string) (*User, error)
+	// DeleteUser(id int64) error
+	// GetUserByEmail(email string) (*User, error)
 }
 
-func (s *PostgresUserStore) CreateUser(user *User) (*User, error) {
+func (s *PostgresUserStore) CreateUser(user *User) error {
 	query := `INSERT INTO users(username, email, password_hash, bio, first_name, last_name, profile_picture)
 	VALUES($1,$2,$3,$4,$5,$6,$7)
 	RETURNING id, created_at, updated_at
@@ -49,7 +75,45 @@ func (s *PostgresUserStore) CreateUser(user *User) (*User, error) {
 	err := s.db.QueryRow(query, user.Username, user.Email, user.PasswordHash.hash, user.Bio, user.FirstName, user.LastName, user.ProfilePicture).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PostgresUserStore) GetUserByUsername(username string) (*User, error) {
+	user := &User{
+		PasswordHash: password{},
+	}
+	query := `SELECT id, username, email, password_hash, bio, first_name, last_name, profile_picture, last_login, created_at, updated_at
+	FROM users WHERE username = $1`
+
+	err := s.db.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash.hash,
+		&user.Bio, &user.FirstName, &user.LastName, &user.ProfilePicture,
+		&user.LastLogin, &user.CreatedAt, &user.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (s *PostgresUserStore) UpdateUser(user *User) error {
+	query := `UPDATE users SET username = $1, email = $2, password_hash = $3, bio = $4, first_name = $5, last_name = $6, profile_picture = $7, updated_at = CURRENT_TIMESTAMP
+	WHERE id = $8
+	RETURNING updated_at
+	`
+	result, err := s.db.Exec(query, user.Username, user.Email, user.PasswordHash.hash, user.Bio, user.FirstName, user.LastName, user.ProfilePicture, user.ID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
