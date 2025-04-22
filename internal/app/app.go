@@ -16,6 +16,7 @@ type Application struct {
 	Logger *log.Logger
 	WorkourHandler *api.WorkourHandler
 	UserHandler *api.UserHandler
+	TokenHandler *api.TokenHandler
 	DB *sql.DB
 }
 
@@ -26,6 +27,7 @@ func NewApplication() (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
+	
 
 	err = store.MigrateFS(pgDB, migrations.FS, ".")
 	if err != nil {
@@ -44,10 +46,13 @@ func NewApplication() (*Application, error) {
 	userHandler:=api.NewUserHandler(userStore, logger)
 
 
+	tokenStore:=store.NewPostgresTokenStore(pgDB)
+	tokenHandler:=api.NewTokenHandler(tokenStore, userStore, logger)
 	app := &Application{
 		Logger: logger,
 		WorkourHandler: workoutHandler,
 		UserHandler: userHandler,
+		TokenHandler: tokenHandler,
 		DB: pgDB,
 	}
 	return app, nil

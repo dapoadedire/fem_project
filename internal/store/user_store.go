@@ -45,7 +45,7 @@ type User struct {
 	FirstName      string    `json:"first_name"`
 	LastName       string    `json:"last_name"`
 	ProfilePicture string    `json:"profile_picture"`
-	LastLogin      string    `json:"last_login"`
+	LastLogin      *string    `json:"last_login"`
 	CreatedAt      string    `json:"created_at"`
 	UpdatedAt      string    `json:"updated_at"`
 	Workouts       []Workout `json:"workouts"`
