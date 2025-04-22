@@ -9,25 +9,25 @@ import (
 
 	"github.com/dapoadedire/fem_project/internal/api"
 	"github.com/dapoadedire/fem_project/internal/store"
+	"github.com/dapoadedire/fem_project/internal/middleware"
 	"github.com/dapoadedire/fem_project/migrations"
 )
 
+
 type Application struct {
-	Logger *log.Logger
-	WorkourHandler *api.WorkourHandler
-	UserHandler *api.UserHandler
-	TokenHandler *api.TokenHandler
-	DB *sql.DB
+	Logger         *log.Logger
+	WorkoutHandler *api.WorkoutHandler
+	UserHandler    *api.UserHandler
+	TokenHandler   *api.TokenHandler
+	Middleware     middleware.UserMiddleware
+	DB             *sql.DB
 }
 
 func NewApplication() (*Application, error) {
-
-	// stores will go here
-	pgDB, err:= store.Open()
+	pgDB, err := store.Open()
 	if err != nil {
 		return nil, err
 	}
-	
 
 	err = store.MigrateFS(pgDB, migrations.FS, ".")
 	if err != nil {
@@ -36,25 +36,26 @@ func NewApplication() (*Application, error) {
 
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
-
+	// our stores will go here
+	workoutStore := store.NewPostgresWorkoutStore(pgDB)
+	userStore := store.NewPostgresUserStore(pgDB)
+	tokenStore := store.NewPostgresTokenStore(pgDB)
 
 	// our handlers will go here
-	workoutStore:=store.NewPostgresWorkoutStore(pgDB)
-	workoutHandler:=api.NewWorkoutHandler(workoutStore, logger)
+	workoutHandler := api.NewWorkoutHandler(workoutStore, logger)
+	userHandler := api.NewUserHandler(userStore, logger)
+	tokenHandler := api.NewTokenHandler(tokenStore, userStore, logger)
+	middlewareHandler := middleware.UserMiddleware{UserStore: userStore}
 
-	userStore:=store.NewPostgresUserStore(pgDB)
-	userHandler:=api.NewUserHandler(userStore, logger)
-
-
-	tokenStore:=store.NewPostgresTokenStore(pgDB)
-	tokenHandler:=api.NewTokenHandler(tokenStore, userStore, logger)
 	app := &Application{
-		Logger: logger,
-		WorkourHandler: workoutHandler,
-		UserHandler: userHandler,
-		TokenHandler: tokenHandler,
-		DB: pgDB,
+		Logger:         logger,
+		WorkoutHandler: workoutHandler,
+		UserHandler:    userHandler,
+		TokenHandler:   tokenHandler,
+		Middleware:     middlewareHandler,
+		DB:             pgDB,
 	}
+
 	return app, nil
 }
 

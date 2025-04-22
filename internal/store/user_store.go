@@ -1,8 +1,10 @@
 package store
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -51,6 +53,11 @@ type User struct {
 	Workouts       []Workout `json:"workouts"`
 }
 
+var AnonymousUser = &User{} // EVERYONE WHOS NOT LOGGED IN
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
+}
+
 type PostgresUserStore struct {
 	db *sql.DB
 }
@@ -63,6 +70,7 @@ type UserStore interface {
 	CreateUser(*User) ( error)
 	GetUserByUsername(username string) (*User, error)
 	UpdateUser(*User) error
+	GetUserToken(scope, tokenPlainText string) (*User, error)
 	// DeleteUser(id int64) error
 	// GetUserByEmail(email string) (*User, error)
 }
@@ -116,4 +124,31 @@ func (s *PostgresUserStore) UpdateUser(user *User) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+
+
+func (s *PostgresUserStore) GetUserToken(scope, plaintextPassword string) (*User, error) {
+	rokenHash := sha256.Sum256([]byte(plaintextPassword))
+	
+	query := `SELECT id, username, email, password_hash, bio, first_name, last_name, profile_picture, last_login, created_at, updated_at
+	FROM users u
+	INNER JOIN tokens t ON t.user_id = u.id
+	WHERE t.hash = $1 AND t.scope = $2 and t.expiry > $3
+	
+	`
+
+	user := &User{
+		PasswordHash: password{},
+	}
+	err := s.db.QueryRow(query, rokenHash[:], scope, time.Now()).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash.hash,
+		&user.Bio, &user.FirstName, &user.LastName, &user.ProfilePicture,
+		&user.LastLogin, &user.CreatedAt, &user.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }

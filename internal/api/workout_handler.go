@@ -10,19 +10,19 @@ import (
 	"github.com/dapoadedire/fem_project/internal/utils"
 )
 
-type WorkourHandler struct {
+type WorkoutHandler struct {
 	workoutStore store.WorkoutStore
 	logger       *log.Logger
 }
 
-func NewWorkoutHandler(workoutStore store.WorkoutStore, logger *log.Logger) *WorkourHandler {
-	return &WorkourHandler{
+func NewWorkoutHandler(workoutStore store.WorkoutStore, logger *log.Logger) *WorkoutHandler {
+	return &WorkoutHandler{
 		workoutStore: workoutStore,
 		logger:       logger,
 	}
 }
 
-func (wh *WorkourHandler) HandleGetWorkoutByID(w http.ResponseWriter, r *http.Request) {
+func (wh *WorkoutHandler) HandleGetWorkoutByID(w http.ResponseWriter, r *http.Request) {
 
 	workoutID, err := utils.ReadIDParam(r)
 	if err != nil {
@@ -42,7 +42,7 @@ func (wh *WorkourHandler) HandleGetWorkoutByID(w http.ResponseWriter, r *http.Re
 
 }
 
-func (wh *WorkourHandler) HandleCreateWorkout(w http.ResponseWriter, r *http.Request) {
+func (wh *WorkoutHandler) HandleCreateWorkout(w http.ResponseWriter, r *http.Request) {
 	var workout store.Workout
 	err := json.NewDecoder(r.Body).Decode(&workout)
 	if err != nil {
@@ -60,7 +60,7 @@ func (wh *WorkourHandler) HandleCreateWorkout(w http.ResponseWriter, r *http.Req
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{"workout": createdWorkout})
 }
 
-func (wh *WorkourHandler) HandleUpdateWorkoutByID(w http.ResponseWriter, r *http.Request) {
+func (wh *WorkoutHandler) HandleUpdateWorkoutByID(w http.ResponseWriter, r *http.Request) {
 	workoutID, err := utils.ReadIDParam(r)
 	if err != nil {
 		wh.logger.Printf("ERROR: readIDParam: %v", err)
@@ -126,7 +126,7 @@ func (wh *WorkourHandler) HandleUpdateWorkoutByID(w http.ResponseWriter, r *http
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"workout": exixtingWorkout})
 }
 
-func (wh *WorkourHandler) HandleDeleteWorkout(w http.ResponseWriter, r *http.Request) {
+func (wh *WorkoutHandler) HandleDeleteWorkout(w http.ResponseWriter, r *http.Request) {
 	workoutID, err := utils.ReadIDParam(r)
 	if err != nil {
 		wh.logger.Printf("ERROR: readIDParam: %v", err)
