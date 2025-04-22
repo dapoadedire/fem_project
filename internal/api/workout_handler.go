@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/dapoadedire/fem_project/internal/middleware"
 	"github.com/dapoadedire/fem_project/internal/store"
 	"github.com/dapoadedire/fem_project/internal/utils"
+	"github.com/go-faster/errors"
 )
 
 type WorkoutHandler struct {
@@ -47,14 +49,21 @@ func (wh *WorkoutHandler) HandleCreateWorkout(w http.ResponseWriter, r *http.Req
 	err := json.NewDecoder(r.Body).Decode(&workout)
 	if err != nil {
 		wh.logger.Printf("ERROR: decodingCreateWorkout: %v", err)
-		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid request sent"})
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "1 invalid request sent"})
 		return
 	}
+
+	currentUser := middleware.GetUser(r)
+	if currentUser == nil || currentUser == store.AnonymousUser {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "you must be logged in to create a workout"})
+		return
+	}
+	workout.UserID = currentUser.ID
 
 	createdWorkout, err := wh.workoutStore.CreateWorkout(&workout)
 	if err != nil {
 		wh.logger.Printf("ERROR: createWorkout: %v", err)
-		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "invalid request sent"})
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "2 invalid request sent"})
 		return
 	}
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{"workout": createdWorkout})
@@ -117,6 +126,28 @@ func (wh *WorkoutHandler) HandleUpdateWorkoutByID(w http.ResponseWriter, r *http
 	}
 	// we can now update the workout
 
+	// check if the user is the owner of the workout
+	currentUser := middleware.GetUser(r)
+	if currentUser == nil || currentUser == store.AnonymousUser {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "you must be logged in to update a workout"})
+		return
+	}
+	ownerID, err := wh.workoutStore.GetWorkoutOwner(workoutID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			wh.logger.Printf("ERROR: workout not found: %v", err)
+			utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "workout not found"})
+			return
+		}
+		wh.logger.Printf("ERROR: getWorkoutOwner: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
+		return
+	}
+	if ownerID != currentUser.ID {
+		utils.WriteJSON(w, http.StatusForbidden, utils.Envelope{"error": "you are not authorized to update this workout"})
+		return
+	}
+
 	err = wh.workoutStore.UpdateWorkout(exixtingWorkout)
 	if err != nil {
 		wh.logger.Printf("ERROR: updateWorkoutByID: %v", err)
@@ -134,6 +165,28 @@ func (wh *WorkoutHandler) HandleDeleteWorkout(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// check if the user is the owner of the workout
+	currentUser := middleware.GetUser(r)
+	if currentUser == nil || currentUser == store.AnonymousUser {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "you must be logged in to update a workout"})
+		return
+	}
+	ownerID, err := wh.workoutStore.GetWorkoutOwner(workoutID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			wh.logger.Printf("ERROR: workout not found: %v", err)
+			utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "workout not found"})
+			return
+		}
+		wh.logger.Printf("ERROR: getWorkoutOwner: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
+		return
+	}
+	if ownerID != currentUser.ID {
+		utils.WriteJSON(w, http.StatusForbidden, utils.Envelope{"error": "you are not authorized to update this workout"})
+		return
+	}
+
 	err = wh.workoutStore.DeleteWorkout(workoutID)
 	if err == sql.ErrNoRows {
 		wh.logger.Printf("ERROR: workout not found: %v", err)
@@ -145,5 +198,5 @@ func (wh *WorkoutHandler) HandleDeleteWorkout(w http.ResponseWriter, r *http.Req
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
 		return
 	}
-		utils.WriteJSON(w, http.StatusNoContent, utils.Envelope{"message": "Workout deleted successfully"})
+	utils.WriteJSON(w, http.StatusNoContent, utils.Envelope{"message": "Workout deleted successfully"})
 }
